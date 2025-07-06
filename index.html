@@ -10,28 +10,22 @@
       --c-bg:#f9f9f9;--c-card:#fff;--c-text:#333;--c-sub:#666;
       --c-primary:#0078d4;--c-primary-dark:#005fa3;--c-error:#e11d48;
     }
-    body{
-      font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-      background:var(--c-bg);color:var(--c-text);
-      margin:0;padding:24px;max-width:960px;margin-inline:auto;
-    }
+    body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--c-bg);color:var(--c-text);margin:0;padding:24px;
+      max-width:960px;margin-inline:auto}
     h1{text-align:center;margin:0 0 18px}
-    textarea{
-      width:100%;height:120px;padding:10px;font-size:14px;box-sizing:border-box;
-      border:1px solid #ccc;border-radius:6px;resize:vertical;
-    }
-    .ctrl{display:flex;align-items:center;gap:16px;margin:14px 0}
-    button{
-      padding:8px 20px;font-size:15px;background:var(--c-primary);
-      color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background .25s;
-    }
-    button:hover{background:var(--c-primary-dark)}
-    button:disabled{opacity:.6;cursor:not-allowed}
+    textarea{width:100%;height:120px;padding:10px;font-size:14px;box-sizing:border-box;
+      border:1px solid #ccc;border-radius:6px;resize:vertical}
+    .ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:14px 0}
+    button{padding:8px 20px;font-size:15px;background:var(--c-primary);color:#fff;
+      border:none;border-radius:6px;cursor:pointer;transition:background .25s}
+    button:hover{background:var(--c-primary-dark)}button:disabled{opacity:.6;cursor:not-allowed}
+    label{font-size:14px;color:var(--c-sub)}
+    input[type="number"],input[type="text"]{padding:6px 8px;font-size:14px;border:1px solid #ccc;
+      border-radius:6px;width:140px}
     #progress{font-size:14px;color:var(--c-sub)}
-    table{
-      width:100%;border-collapse:collapse;background:var(--c-card);
-      box-shadow:0 2px 6px rgba(0,0,0,.06);margin-top:12px
-    }
+    table{width:100%;border-collapse:collapse;background:var(--c-card);
+      box-shadow:0 2px 6px rgba(0,0,0,.06);margin-top:12px}
     th,td{padding:8px 6px;border:1px solid #e5e7eb;text-align:center;font-size:14px}
     tbody tr:nth-child(odd){background:#fafafa}
     .error{color:var(--c-error);font-weight:600}
@@ -39,8 +33,7 @@
     .summary strong{color:var(--c-primary)}
     @media(prefers-color-scheme:dark){
       :root{--c-bg:#111827;--c-card:#1f2937;--c-text:#e5e7eb;--c-sub:#9ca3af}
-      table{box-shadow:none}
-      tbody tr:nth-child(odd){background:#1b2431}
+      table{box-shadow:none}tbody tr:nth-child(odd){background:#1b2431}
       th,td{border-color:#374151}
     }
   </style>
@@ -51,6 +44,14 @@
   <textarea id="addrInput" placeholder="每行一个钱包地址"></textarea>
 
   <div class="ctrl">
+    <label>FDV (USD)
+      <input id="fdvInput" type="number" step="0.01" value="1000000000">
+    </label>
+
+    <label>空投比例 % (逗号分隔)
+      <input id="ratioInput" type="text" value="2,3,5">
+    </label>
+
     <button id="queryBtn">开始查询</button>
     <span id="progress"></span>
   </div>
@@ -59,27 +60,28 @@
   <div id="summary" class="summary"></div>
 
 <script>
-const CONCURRENCY   = 5;                       // 并发数
-const TOTAL_SUPPLY  = 130_700_000_000;         // 1 307 亿 LXP-L
-const FDV           = 1_000_000_000;           // 10 亿 USD
-const RATIOS        = [0.02, 0.03, 0.05];      // 2%、3%、5%
+const TOTAL_SUPPLY = 130_700_000_000;  // 1 307 亿 LXP-L
+const CONCURRENCY  = 5;
 
-const btn   = document.getElementById('queryBtn');
+const btn = document.getElementById('queryBtn');
 btn.addEventListener('click', async () => {
   const raw   = document.getElementById('addrInput').value.trim();
   const addrs = raw.split(/\s+/).filter(Boolean);
   if (!addrs.length) return;
 
+  const fdv   = Number(document.getElementById('fdvInput').value) || 0;
+  const ratios= document.getElementById('ratioInput').value
+                  .split(',')
+                  .map(s=>Number(s.trim())/100)
+                  .filter(n=>n>0);
+
   btn.disabled = true;
-  const prog = document.getElementById('progress');
+  const prog   = document.getElementById('progress');
   prog.textContent = `0 / ${addrs.length}`;
 
-  // 初始化表格
+  // 清空结果与摘要
   document.getElementById('result').innerHTML = `
-    <table>
-      <thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead>
-      <tbody></tbody>
-    </table>`;
+    <table><thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead><tbody></tbody></table>`;
   const tbody = document.querySelector('#result tbody');
   document.getElementById('summary').innerHTML = '';
 
@@ -92,14 +94,14 @@ btn.addEventListener('click', async () => {
       try{
         const r  = await fetch(`/api/points?user=${addr}`);
         if(!r.ok) throw new Error(r.status);
-        const t  = await r.text();
-        const d  = t ? JSON.parse(t) : {};
-        const o  = Array.isArray(d) ? d[0] : d?.[0] ?? d;
+        const txt= await r.text();
+        const dat= txt ? JSON.parse(txt) : {};
+        const o  = Array.isArray(dat) ? dat[0] : dat?.[0] ?? dat;
         const xp = Number(o?.xp ?? 0);
         const rk = o?.rank_xp ?? '-';
         xpTotal += xp;
         addRow(i, addr, xp ? xp.toLocaleString() : '-', rk);
-      }catch(e){
+      }catch(err){
         addRow(i, addr, '—', '查询失败', true);
       }finally{
         prog.textContent = `${++done} / ${addrs.length}`;
@@ -110,8 +112,7 @@ btn.addEventListener('click', async () => {
   function addRow(i, addr, lxp, rank, err=false){
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${i+1}</td>
-      <td>${addr}</td>
+      <td>${i+1}</td><td>${addr}</td>
       <td${err?' class="error"':''}>${lxp}</td>
       <td${err?' class="error"':''}>${rank}</td>`;
     tbody.appendChild(tr);
@@ -121,19 +122,19 @@ btn.addEventListener('click', async () => {
   prog.textContent += ' ✔';
   btn.disabled = false;
 
-  // === 统计与估算 ===
-  const totalFmt = xpTotal.toLocaleString();
+  // 统计 & 估算
+  const summary = document.getElementById('summary');
   let html = `<strong>已查询地址：</strong>${addrs.length} 个<br>
-              <strong>LXP-L 总和：</strong>${totalFmt}`;
-  if(xpTotal){
+              <strong>LXP-L 总和：</strong>${xpTotal.toLocaleString()}`;
+  if(xpTotal && fdv && ratios.length){
     const share = xpTotal / TOTAL_SUPPLY;
-    html += `<br><strong>空投估算 (FDV \$${(FDV/1e6).toLocaleString()}M)：</strong><br>`;
-    RATIOS.forEach(r=>{
-      const value = FDV * r * share;
-      html += `&nbsp;&nbsp;• 比例 ${(r*100).toFixed(0)}% ≈ <strong>$${value.toFixed(2)}</strong><br>`;
+    html += `<br><strong>空投估算 (FDV \$${fdv.toLocaleString()}):</strong><br>`;
+    ratios.forEach(r=>{
+      const usd = fdv * r * share;
+      html += `&nbsp;&nbsp;• 比例 ${(r*100).toFixed(2)}% ≈ <strong>$${usd.toFixed(2)}</strong><br>`;
     });
   }
-  document.getElementById('summary').innerHTML = html;
+  summary.innerHTML = html;
 });
 </script>
 </body>
