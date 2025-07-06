@@ -4,7 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>LXP-L 批量查询 & 空投估算</title>
-<link rel="icon" href="favicon.ico">
+
+<!-- 网站头像 -->
+<link rel="icon" href="oq6oo-k8xhm-001.ico">
+
+<!-- dom-to-image 生成分享图 -->
+<script src="https://cdn.jsdelivr.net/npm/dom-to-image@2.6.0/dist/dom-to-image.min.js"></script>
+
 <style>
 :root{--c-bg:#fafafa;--c-card:#fff;--c-text:#333;--c-sub:#666;
       --c-primary:#28a745;--c-primary-dark:#1e7e34;--c-error:#e11d48;}
@@ -17,8 +23,8 @@ h2{margin:0 0 20px;font-size:24px;display:flex;align-items:center;gap:8px}
 h2 .icon{font-size:26px}
 textarea{width:100%;height:110px;padding:10px;font-size:14px;border:1px solid #ccc;
         border-radius:6px;resize:vertical;box-sizing:border-box}
-button{padding:8px 20px;font-size:15px;border:none;border-radius:6px;
-       cursor:pointer;background:var(--c-primary);color:#fff;transition:background .25s}
+button{padding:8px 20px;font-size:15px;border:none;border-radius:6px;cursor:pointer;
+       background:var(--c-primary);color:#fff;transition:background .25s}
 button:hover{background:var(--c-primary-dark)}
 button:disabled{opacity:.6;cursor:not-allowed}
 input[type="number"],input[type="text"]{padding:6px 8px;font-size:14px;border:1px solid #ccc;
@@ -33,9 +39,14 @@ tbody tr:nth-child(odd){background:#f5f5f5}
 .error{color:var(--c-error);font-weight:600}
 .summary{margin:8px 0 0;font-size:15px}
 .summary strong{color:var(--c-primary)}
-#toggleBtn{margin-top:10px;background:#0078d4}
-#toggleBtn:hover{background:#0061ad}
 .fix-est{position:sticky;top:24px;z-index:5}
+
+/* 分享按钮 */
+#shareBtn{position:fixed;right:24px;bottom:24px;width:56px;height:56px;border:none;
+          border-radius:50%;font-size:14px;font-weight:600;background:var(--c-primary);
+          color:#fff;cursor:pointer;display:none;box-shadow:0 4px 10px rgba(0,0,0,.25)}
+#shareBtn:hover{background:var(--c-primary-dark)}
+
 @media(prefers-color-scheme:dark){
  :root{--c-bg:#111827;--c-card:#1f2937;--c-text:#e5e7eb;--c-sub:#9ca3af}
  table th,table td{border-color:#374151}
@@ -45,7 +56,11 @@ tbody tr:nth-child(odd){background:#f5f5f5}
 </style>
 </head>
 <body>
-<div class="container">
+
+<!-- 分享按钮 -->
+<button id="shareBtn">分享</button>
+
+<div class="container" id="captureArea"><!-- 分享截图区域开始 -->
 
   <!-- ===== 卡片 1：批量查询 ===== -->
   <div class="card" id="queryCard">
@@ -57,7 +72,7 @@ tbody tr:nth-child(odd){background:#f5f5f5}
 
     <div id="queryResult"></div>
     <p id="querySummary" class="summary"></p>
-    <button id="toggleBtn" style="display:none">展开剩余</button>
+    <button id="toggleBtn" style="display:none;background:#0078d4">展开剩余</button>
   </div>
 
   <!-- ===== 卡片 2：空投估算 ===== -->
@@ -82,83 +97,100 @@ tbody tr:nth-child(odd){background:#f5f5f5}
     <div id="calcTableWrap"></div>
   </div>
 
-</div>
+</div><!-- captureArea 结束 -->
 
 <script>
-const TOTAL = 130_700_000_000, CON=5, PREVIEW=20;
-const fdvInput=document.getElementById('fdvInput'), fdvHint=document.getElementById('fdvHint');
-fdvInput.oninput=()=>fdvHint.textContent=fdvInput.value?`≈ ${(fdvInput.value/1e8).toFixed(2)} 亿`:'';
-fdvInput.oninput();
+/* ========= 常量 ========= */
+const TOTAL = 130_700_000_000;       // LXP-L 总量
+const CON   = 5;                     // 请求并发
+const PRE   = 20;                    // 先显示行数
 
-const badge=document.getElementById('badge');
-const queryBtn=document.getElementById('queryBtn');
-const toggleBtn=document.getElementById('toggleBtn');
-const calcBtn=document.getElementById('calcBtn');
-const calcWrap=document.getElementById('calcTableWrap');
-const myXpInput=document.getElementById('myXpInput');
-const myXpPct=document.getElementById('myXpPct');
+/* ========= FDV 输入提示 ========= */
+const fdvI = document.getElementById('fdvInput');
+const fdvH = document.getElementById('fdvHint');
+fdvI.oninput = ()=>fdvH.textContent = fdvI.value ? `≈ ${(fdvI.value/1e8).toFixed(2)} 亿` : '';
+fdvI.oninput();
 
-queryBtn.onclick=async()=>{
+/* ========= 主要 DOM ========= */
+const badge     = document.getElementById('badge');
+const queryBtn  = document.getElementById('queryBtn');
+const toggleBtn = document.getElementById('toggleBtn');
+const shareBtn  = document.getElementById('shareBtn');
+const myXpInput = document.getElementById('myXpInput');
+const myXpPct   = document.getElementById('myXpPct');
+const calcBtn   = document.getElementById('calcBtn');
+const calcWrap  = document.getElementById('calcTableWrap');
+
+/* ========= 查询逻辑 ========= */
+queryBtn.onclick = async ()=>{
   const addrs=document.getElementById('addrInput').value.trim().split(/\s+/).filter(Boolean);
-  if(!addrs.length)return;
-  badge.textContent=`0/${addrs.length}`;
+  if(!addrs.length) return;
+  shareBtn.style.display='none';
 
+  badge.textContent=`0/${addrs.length}`;
   const tbody=(()=>{
     document.getElementById('queryResult').innerHTML=
-      `<table><thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead><tbody></tbody></table>`;
+      '<table><thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead><tbody></tbody></table>';
     return document.querySelector('#queryResult tbody');
   })();
-
   document.getElementById('querySummary').textContent='';
   calcWrap.innerHTML=''; toggleBtn.style.display='none';
 
-  let cursor=0,done=0,sum=0,rowEls=[];
+  let cur=0, done=0, sum=0, hiddenRows=[];
   async function worker(){
-    while(cursor<addrs.length){
-      const i=cursor++, addr=addrs[i].toLowerCase();
-      let xp=0,rk='-'; let err=false;
+    while(cur<addrs.length){
+      const i=cur++,addr=addrs[i].toLowerCase();
+      let xp=0,rk='-',err=false;
       try{
-        const r=await fetch(`/api/points?user=${addr}`);if(!r.ok)throw 0;
-        const d=JSON.parse(await r.text()||'{}');const o=Array.isArray(d)?d[0]:d?.[0]??d;
+        const r=await fetch(`/api/points?user=${addr}`); if(!r.ok) throw 0;
+        const d=JSON.parse(await r.text()||'{}'); const o=Array.isArray(d)?d[0]:d?.[0]??d;
         xp=+o?.xp||0; rk=o?.rank_xp??'-'; sum+=xp;
       }catch{err=true;}
+
       const tr=document.createElement('tr');
-      tr.className=(i>=PREVIEW?'hideRow':'');
+      if(i>=PRE) tr.className='hideRow';
       tr.innerHTML=`<td>${i+1}</td><td>${addr}</td>
         <td${err?' class="error"':''}>${xp?xp.toLocaleString():'—'}</td>
         <td${err?' class="error"':''}>${rk}</td>`;
-      rowEls.push(tr);
-      done++; badge.textContent=`${done}/${addrs.length}`;
+
+      if(i<PRE) tbody.appendChild(tr);           // 前 20 行即时显示
+      else      hiddenRows.push(tr);             // 其余暂存
+
+      badge.textContent=`${++done}/${addrs.length}`;
     }
   }
   await Promise.all(Array.from({length:CON},worker));
-  // 批量插入减少回流
-  tbody.append(...rowEls);
+  // 插入隐藏行
+  if(hiddenRows.length) tbody.append(...hiddenRows);
 
+  // 统计 & 自动估算
   document.getElementById('querySummary').innerHTML=
     `<strong>地址：</strong>${addrs.length}　|　<strong>LXP-L：</strong>${sum.toLocaleString()}`;
   myXpInput.value=sum||''; myXpPct.textContent=((sum/TOTAL)*100).toFixed(2);
+  autoCalc();
 
-  if(addrs.length>PREVIEW){
-    toggleBtn.textContent=`展开剩余 ${addrs.length-PREVIEW} 行`;
+  // 展开/收起按钮
+  if(hiddenRows.length){
+    toggleBtn.textContent=`展开剩余 ${hiddenRows.length} 行`;
     toggleBtn.style.display='inline-block';
   }
-  window.scrollTo({top:0,behavior:'smooth'});
-  autoCalc();
+  // 显示分享按钮
+  shareBtn.style.display='block';
 };
 
 toggleBtn.onclick=()=>{
   const hidden=document.querySelectorAll('.hideRow');
-  const expanding=toggleBtn.textContent.startsWith('展开');
-  hidden.forEach(el=>el.style.display=expanding?'table-row':'none');
-  toggleBtn.textContent=expanding?'收起':'展开剩余 '+hidden.length+' 行';
+  const expand=toggleBtn.textContent.startsWith('展开');
+  hidden.forEach(row=>row.style.display=expand?'table-row':'none');
+  toggleBtn.textContent=expand?'收起':`展开剩余 ${hidden.length} 行`;
 };
 
+/* ========= 估算 ========= */
 function autoCalc(){ calcBtn.click(); }
 calcBtn.onclick=()=>{
-  const xp=+myXpInput.value||0, fdv=+fdvInput.value||0;
-  const rates=ratioInput.value.split(',').map(s=>+s/100).filter(n=>n>0);
-  if(!xp||!fdv||!rates.length)return;
+  const xp=+myXpInput.value||0, fdv=+fdvI.value||0,
+        rates=document.getElementById('ratioInput').value.split(',').map(s=>+s/100).filter(n=>n>0);
+  if(!xp||!fdv||!rates.length) return;
   const price=fdv/TOTAL;
   calcWrap.innerHTML=`<table><thead><tr><th>空投百分比</th><th>空投金额 (万元)</th>
     <th>每 LXP-L 价格 (USD)</th><th>你的空投价值 (USD)</th></tr></thead><tbody>
@@ -166,9 +198,20 @@ calcBtn.onclick=()=>{
       const pool=fdv*r/1e4, usd=xp*r*price;
       return `<tr><td>${(r*100).toFixed(2)}%</td>
         <td>${pool.toLocaleString(undefined,{maximumFractionDigits:2})}</td>
-        <td>${price.toFixed(6)}</td>
-        <td>${usd.toFixed(2)}</td></tr>`;}).join('')}
-    </tbody></table>`;
+        <td>${price.toFixed(6)}</td><td>${usd.toFixed(2)}</td></tr>`;}).join('')}
+  </tbody></table>`;
+};
+
+/* ========= 分享图 ========= */
+shareBtn.onclick=()=>{
+  shareBtn.disabled=true; shareBtn.textContent='生成中…';
+  domtoimage.toPng(document.getElementById('captureArea'),{pixelRatio:2})
+    .then(url=>{
+      const a=document.createElement('a'); a.href=url; a.download='lxp-l_snapshot.png'; a.click();
+      shareBtn.disabled=false; shareBtn.textContent='分享';
+    })
+    .catch(e=>{alert('生成失败');console.error(e);
+      shareBtn.disabled=false; shareBtn.textContent='分享';});
 };
 </script>
 </body>
