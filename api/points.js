@@ -1,21 +1,18 @@
-// Vercel 自动把 /api/points 映射到这个文件
+// api/points.js   (Node.js 18 默认运行时)
 export default async function handler(req, res) {
-  const { user } = req.query;            // /api/points?user=0x...
-  if (!user) {
-    return res.status(400).json({ error: 'Missing user param' });
-  }
+  const { user = '' } = req.query;                                   // 1
+  if (!/^0x[a-fA-F0-9]{40}$/.test(user)) return res.status(400).json({ error: 'bad address' }); // 2
+
+  const url = `https://kx58j6x5me.execute-api.us-east-1.amazonaws.com/linea/getUserPointsSearch?user=${user.toLowerCase()}`; // 3
 
   try {
-    const upstream = await fetch(
-      `https://kx58j6x5me.execute-api.us-east-1.amazonaws.com/linea/getUserPointsSearch?user=${user}`
-    );
-    if (!upstream.ok) throw new Error(upstream.statusText);
-    const data = await upstream.json();
+    const r = await fetch(url, { timeout: 10_000 });                 // 4
+    const body = await r.text();                                     // 5
 
-    // 若想允许别家域名用你这个代理，再放开下面一行
-    // res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(200).json(data);
+    res.setHeader('Access-Control-Allow-Origin', '*');               // 6
+    res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate'); // 7
+    res.status(r.status).send(body);                                 // 8
   } catch (e) {
-    res.status(502).json({ error: 'Upstream fetch failed', detail: e.message });
-  }
+    res.status(502).json({ error: e.message || 'upstream error' });  // 9
+  }                                                                  // 10
 }
