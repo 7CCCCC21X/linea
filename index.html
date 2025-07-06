@@ -1,78 +1,122 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>Linea XP 批量查询</title>
-<style>
-/* —— 样式同上一版，略 —— */
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>LXP-L & 排名批量查询</title>
+  <link rel="icon" href="favicon.ico" />
+
+  <style>
+    :root{
+      --c-bg:#f9f9f9;--c-card:#fff;--c-text:#333;--c-sub:#666;
+      --c-primary:#0078d4;--c-primary-dark:#005fa3;--c-error:#e11d48;
+    }
+    body{
+      font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+      background:var(--c-bg);color:var(--c-text);
+      margin:0;padding:24px;max-width:960px;margin-inline:auto;
+    }
+    h1{text-align:center;margin:0 0 18px}
+    textarea{
+      width:100%;height:120px;font-size:14px;padding:10px;
+      border:1px solid #ccc;border-radius:6px;resize:vertical;box-sizing:border-box;
+    }
+    .ctrl{display:flex;align-items:center;gap:16px;margin:14px 0}
+    button{
+      padding:8px 20px;font-size:15px;background:var(--c-primary);
+      color:#fff;border:none;border-radius:6px;cursor:pointer;transition:background .25s;
+    }
+    button:hover{background:var(--c-primary-dark)}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    #progress{font-size:14px;color:var(--c-sub)}
+    table{
+      width:100%;border-collapse:collapse;background:var(--c-card);
+      box-shadow:0 2px 6px rgba(0,0,0,.06);margin-top:12px
+    }
+    th,td{padding:8px 6px;border:1px solid #e5e7eb;text-align:center;font-size:14px}
+    tbody tr:nth-child(odd){background:#fafafa}
+    .error{color:var(--c-error);font-weight:600}
+    @media(prefers-color-scheme:dark){
+      :root{--c-bg:#111827;--c-card:#1f2937;--c-text:#e5e7eb;--c-sub:#9ca3af}
+      table{box-shadow:none}
+      tbody tr:nth-child(odd){background:#1b2431}
+      th,td{border-color:#374151}
+    }
+  </style>
 </head>
 <body>
-<h1>Linea XP 批量查询</h1>
+  <h1>LXP-L & 排名批量查询</h1>
 
-<textarea id="addrInput" placeholder="每行粘贴一个地址"></textarea><br>
-<button id="startBtn">开始查询</button>
+  <textarea id="addrInput" placeholder="每行一个钱包地址"></textarea>
 
-<div id="stats">待查询地址：0</div>
+  <div class="ctrl">
+    <button id="queryBtn">开始查询</button>
+    <span id="progress"></span>
+  </div>
 
-<table id="resultTable" hidden>
-  <thead><tr><th>#</th><th>地址</th><th>rank_xp</th><th>xp</th><th>状态</th></tr></thead>
-  <tbody></tbody>
-</table>
+  <div id="result"></div>
 
-<script>
-// ‹‹‹ 只改这一行：指向同源的 /api/points
-const api = '/api/points?user=';
+  <script>
+    const btn = document.getElementById('queryBtn');
 
-const addrInput = document.getElementById('addrInput');
-const startBtn  = document.getElementById('startBtn');
-const statsEl   = document.getElementById('stats');
-const tbody     = document.querySelector('#resultTable tbody');
-const table     = document.getElementById('resultTable');
+    btn.addEventListener('click', async () => {
+      const raw    = document.getElementById('addrInput').value.trim();
+      const addrs  = raw.split(/\s+/).filter(Boolean);
+      if (!addrs.length) return;
 
-function parseAddrs(txt){
-  return txt.split(/[\s,;\n\r]+/).map(a=>a.trim())
-            .filter(a=>/^0x[0-9a-fA-F]{40}$/.test(a));
-}
-function updateStats(total, done, ok, fail){
-  statsEl.textContent = `总数：${total} · 已完成：${done}/${total} · 成功 ${ok} · 失败 ${fail}`;
-}
-async function fetchOne(addr){
-  const res = await fetch(api + addr);
-  if(!res.ok) throw new Error(res.status);
-  const data = await res.json();
-  if(!Array.isArray(data) || !data.length) throw new Error('空响应');
-  const {rank_xp,xp} = data[0];
-  return {rank_xp,xp};
-}
+      btn.disabled = true;
+      const prog   = document.getElementById('progress');
+      prog.textContent = `0 / ${addrs.length}`;
 
-startBtn.onclick = async () => {
-  const addrs = parseAddrs(addrInput.value);
-  if(!addrs.length){ alert('请先粘贴地址'); return; }
-  table.hidden = false;
-  tbody.innerHTML = '';
-  startBtn.disabled = true;
-  let done=0, ok=0, fail=0;
-  updateStats(addrs.length, done, ok, fail);
+      // 创建结果表
+      document.getElementById('result').innerHTML = `
+        <table>
+          <thead>
+            <tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr>
+          </thead><tbody></tbody>
+        </table>`;
+      const tbody  = document.querySelector('#result tbody');
 
-  for(let i=0;i<addrs.length;i++){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${i+1}</td><td>${addrs[i]}</td><td>…</td><td>…</td><td>查询中</td>`;
-    tbody.appendChild(tr);
-    try{
-      const {rank_xp,xp}=await fetchOne(addrs[i]);
-      tr.cells[2].textContent=rank_xp.toLocaleString();
-      tr.cells[3].textContent=xp.toLocaleString();
-      tr.cells[4].textContent='成功'; ok++;
-    }catch(e){
-      tr.classList.add('error');
-      tr.cells[4].textContent='失败'; fail++;
-    }
-    done++; updateStats(addrs.length, done, ok, fail);
-  }
-  startBtn.disabled = false;
-};
-</script>
+      let done = 0;
+      const CONCURRENCY = 5;
+      let cursor = 0;
+
+      async function worker() {
+        while (cursor < addrs.length) {
+          const idx  = cursor++;
+          const addr = addrs[idx].trim().toLowerCase();
+          const api  = `/api/points?user=${addr}`;   // ← 调用你在 Vercel 部署的代理
+
+          try {
+            const r   = await fetch(api);
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            const txt = await r.text();              // upstream 返回 text/plain
+            const dat = txt ? JSON.parse(txt) : {};
+            const o   = Array.isArray(dat) ? dat[0] : dat?.[0] ?? dat;
+            addRow(idx, addr, o?.xp ?? '-', o?.rank_xp ?? '-');
+          } catch (err) {
+            console.error(addr, err);
+            addRow(idx, addr, '—', '查询失败', true);
+          } finally {
+            prog.textContent = `${++done} / ${addrs.length}`;
+          }
+        }
+      }
+
+      function addRow(i, addr, lxp, rank, err=false) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${addr}</td>
+          <td${err ? ' class="error"' : ''}>${lxp}</td>
+          <td${err ? ' class="error"' : ''}>${rank}</td>`;
+        tbody.appendChild(tr);
+      }
+
+      await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+      prog.textContent += ' ✔';
+      btn.disabled = false;
+    });
+  </script>
 </body>
 </html>
