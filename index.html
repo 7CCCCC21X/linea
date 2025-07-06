@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>Linea XP 批量查询</title>
+<style>
+/* —— 样式同上一版，略 —— */
+</style>
+</head>
+<body>
+<h1>Linea XP 批量查询</h1>
+
+<textarea id="addrInput" placeholder="每行粘贴一个地址"></textarea><br>
+<button id="startBtn">开始查询</button>
+
+<div id="stats">待查询地址：0</div>
+
+<table id="resultTable" hidden>
+  <thead><tr><th>#</th><th>地址</th><th>rank_xp</th><th>xp</th><th>状态</th></tr></thead>
+  <tbody></tbody>
+</table>
+
+<script>
+// ‹‹‹ 只改这一行：指向同源的 /api/points
+const api = '/api/points?user=';
+
+const addrInput = document.getElementById('addrInput');
+const startBtn  = document.getElementById('startBtn');
+const statsEl   = document.getElementById('stats');
+const tbody     = document.querySelector('#resultTable tbody');
+const table     = document.getElementById('resultTable');
+
+function parseAddrs(txt){
+  return txt.split(/[\s,;\n\r]+/).map(a=>a.trim())
+            .filter(a=>/^0x[0-9a-fA-F]{40}$/.test(a));
+}
+function updateStats(total, done, ok, fail){
+  statsEl.textContent = `总数：${total} · 已完成：${done}/${total} · 成功 ${ok} · 失败 ${fail}`;
+}
+async function fetchOne(addr){
+  const res = await fetch(api + addr);
+  if(!res.ok) throw new Error(res.status);
+  const data = await res.json();
+  if(!Array.isArray(data) || !data.length) throw new Error('空响应');
+  const {rank_xp,xp} = data[0];
+  return {rank_xp,xp};
+}
+
+startBtn.onclick = async () => {
+  const addrs = parseAddrs(addrInput.value);
+  if(!addrs.length){ alert('请先粘贴地址'); return; }
+  table.hidden = false;
+  tbody.innerHTML = '';
+  startBtn.disabled = true;
+  let done=0, ok=0, fail=0;
+  updateStats(addrs.length, done, ok, fail);
+
+  for(let i=0;i<addrs.length;i++){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td>${addrs[i]}</td><td>…</td><td>…</td><td>查询中</td>`;
+    tbody.appendChild(tr);
+    try{
+      const {rank_xp,xp}=await fetchOne(addrs[i]);
+      tr.cells[2].textContent=rank_xp.toLocaleString();
+      tr.cells[3].textContent=xp.toLocaleString();
+      tr.cells[4].textContent='成功'; ok++;
+    }catch(e){
+      tr.classList.add('error');
+      tr.cells[4].textContent='失败'; fail++;
+    }
+    done++; updateStats(addrs.length, done, ok, fail);
+  }
+  startBtn.disabled = false;
+};
+</script>
+</body>
+</html>
