@@ -1,141 +1,191 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>LXP-L 批量查询 & 空投估算</title>
-  <link rel="icon" href="favicon.ico" />
-  <style>
-    :root{
-      --c-bg:#f9f9f9;--c-card:#fff;--c-text:#333;--c-sub:#666;
-      --c-primary:#0078d4;--c-primary-dark:#005fa3;--c-error:#e11d48;
-    }
-    body{font-family:"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-      background:var(--c-bg);color:var(--c-text);margin:0;padding:24px;
-      max-width:960px;margin-inline:auto}
-    h1{text-align:center;margin:0 0 18px}
-    textarea{width:100%;height:120px;padding:10px;font-size:14px;box-sizing:border-box;
-      border:1px solid #ccc;border-radius:6px;resize:vertical}
-    .ctrl{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin:14px 0}
-    button{padding:8px 20px;font-size:15px;background:var(--c-primary);color:#fff;
-      border:none;border-radius:6px;cursor:pointer;transition:background .25s}
-    button:hover{background:var(--c-primary-dark)}button:disabled{opacity:.6;cursor:not-allowed}
-    label{font-size:14px;color:var(--c-sub)}
-    input[type="number"],input[type="text"]{padding:6px 8px;font-size:14px;border:1px solid #ccc;
-      border-radius:6px;width:140px}
-    #progress{font-size:14px;color:var(--c-sub)}
-    table{width:100%;border-collapse:collapse;background:var(--c-card);
-      box-shadow:0 2px 6px rgba(0,0,0,.06);margin-top:12px}
-    th,td{padding:8px 6px;border:1px solid #e5e7eb;text-align:center;font-size:14px}
-    tbody tr:nth-child(odd){background:#fafafa}
-    .error{color:var(--c-error);font-weight:600}
-    .summary{margin-top:16px;font-size:15px;line-height:1.7}
-    .summary strong{color:var(--c-primary)}
-    @media(prefers-color-scheme:dark){
-      :root{--c-bg:#111827;--c-card:#1f2937;--c-text:#e5e7eb;--c-sub:#9ca3af}
-      table{box-shadow:none}tbody tr:nth-child(odd){background:#1b2431}
-      th,td{border-color:#374151}
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0" />
+<title>LXP-L 批量查询 & 空投估算</title>
+<link rel="icon" href="favicon.ico" />
+<style>
+:root{
+  --c-bg:#fafafa; --c-card:#fff; --c-text:#333; --c-sub:#666;
+  --c-primary:#28a745; --c-primary-dark:#1e7e34; --c-error:#e11d48;
+}
+body{font-family:-apple-system,Segoe UI,PingFang SC,Helvetica,Arial,sans-serif;
+  background:var(--c-bg);color:var(--c-text);margin:0;padding:32px}
+.container{max-width:800px;margin:auto}
+.card{background:var(--c-card);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.05);
+  padding:28px 32px;margin-bottom:40px}
+h2{margin:0 0 20px;font-size:24px;display:flex;align-items:center;gap:8px}
+h2 .icon{font-size:26px;line-height:1}
+textarea{width:100%;height:110px;padding:10px;font-size:14px;border:1px solid #ccc;
+  border-radius:6px;resize:vertical;box-sizing:border-box}
+button{padding:8px 20px;font-size:15px;border:none;border-radius:6px;
+  cursor:pointer;background:var(--c-primary);color:#fff;transition:background .25s}
+button:hover{background:var(--c-primary-dark)}button:disabled{opacity:.6;cursor:not-allowed}
+input[type="number"],input[type="text"]{padding:6px 8px;font-size:14px;border:1px solid #ccc;
+  border-radius:6px;width:180px}
+label{font-size:14px;color:var(--c-sub);display:flex;align-items:center;gap:6px;margin:8px 0}
+.progress{font-size:14px;color:var(--c-sub);margin-left:10px}
+table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
+th,td{border:1px solid #e5e7eb;padding:6px;text-align:center}
+tbody tr:nth-child(odd){background:#f5f5f5}
+.error{color:var(--c-error);font-weight:600}
+.summary{margin-top:12px;font-size:15px;line-height:1.7}
+.summary strong{color:var(--c-primary)}
+.author{position:absolute;top:12px;right:16px;font-size:14px}
+.author a{color:var(--c-primary);text-decoration:none}
+@media(prefers-color-scheme:dark){
+  :root{--c-bg:#111827;--c-card:#1f2937;--c-text:#e5e7eb;--c-sub:#9ca3af}
+  table th,table td{border-color:#374151}
+  tbody tr:nth-child(odd){background:#1b2431}
+}
+</style>
 </head>
 <body>
-  <h1>LXP-L 批量查询 & 空投估算</h1>
+<div class="author">作者推特：<a href="https://x.com/0xXIAOc" target="_blank">@0xXIAOc</a></div>
 
-  <textarea id="addrInput" placeholder="每行一个钱包地址"></textarea>
+<div class="container">
 
-  <div class="ctrl">
-    <label>FDV (USD)
-      <input id="fdvInput" type="number" step="0.01" value="1000000000">
+  <!-- ===== 卡片 1：批量查询 ===== -->
+  <div class="card">
+    <h2><span class="icon">🌱</span>LXP-L 积分查询（支持批量地址）</h2>
+
+    <textarea id="addrInput" placeholder="每行一个钱包地址"></textarea>
+
+    <div style="margin-top:12px">
+      <button id="queryBtn">查询</button>
+      <span id="progress" class="progress"></span>
+    </div>
+
+    <div id="queryResult"></div>
+    <div id="querySummary" class="summary"></div>
+  </div>
+
+  <!-- ===== 卡片 2：空投金额估算 ===== -->
+  <div class="card">
+    <h2><span class="icon">🍯</span>空投金额估算 <small style="font-size:80%;color:var(--c-sub)">by @0xXIAOc</small></h2>
+
+    <label>
+      假设项目 FDV（完全稀释估值）=
+      <input id="fdvInput" type="number" value="1000000000" step="1000000"> 元
     </label>
 
-    <label>空投比例 % (逗号分隔)
+    <label>
+      你拥有的 LXP-L 数量=
+      <input id="myXpInput" type="number" placeholder="先查询或手填">
+      <span style="font-size:13px;color:var(--c-sub)">≈ <span id="myXpPct">0</span> %</span>
+    </label>
+
+    <label>
+      空投百分比（多个用逗号分隔）：
       <input id="ratioInput" type="text" value="2,3,5">
     </label>
 
-    <button id="queryBtn">开始查询</button>
-    <span id="progress"></span>
+    <button id="calcBtn">计算</button>
+
+    <div id="calcTableWrap"></div>
   </div>
 
-  <div id="result"></div>
-  <div id="summary" class="summary"></div>
+</div>
 
 <script>
-const TOTAL_SUPPLY = 130_700_000_000;  // 1 307 亿 LXP-L
+/* ===== 常量 ===== */
+const TOTAL_SUPPLY = 130_700_000_000;   // 1 307 亿 LXP-L
 const CONCURRENCY  = 5;
 
-const btn = document.getElementById('queryBtn');
-btn.addEventListener('click', async () => {
-  const raw   = document.getElementById('addrInput').value.trim();
-  const addrs = raw.split(/\s+/).filter(Boolean);
+/* ===== DOM ===== */
+const queryBtn   = document.getElementById('queryBtn');
+const progressEl = document.getElementById('progress');
+const queryResEl = document.getElementById('queryResult');
+const querySumEl = document.getElementById('querySummary');
+
+const fdvInput   = document.getElementById('fdvInput');
+const myXpInput  = document.getElementById('myXpInput');
+const ratioInput = document.getElementById('ratioInput');
+const myXpPctEl  = document.getElementById('myXpPct');
+const calcBtn    = document.getElementById('calcBtn');
+const calcWrap   = document.getElementById('calcTableWrap');
+
+/* ===== 批量查询 ===== */
+queryBtn.onclick = async () => {
+  const addrs = document.getElementById('addrInput').value.trim()
+                  .split(/\s+/).filter(Boolean);
   if (!addrs.length) return;
 
-  const fdv   = Number(document.getElementById('fdvInput').value) || 0;
-  const ratios= document.getElementById('ratioInput').value
-                  .split(',')
-                  .map(s=>Number(s.trim())/100)
-                  .filter(n=>n>0);
+  queryBtn.disabled = true;
+  progressEl.textContent = `0 / ${addrs.length}`;
 
-  btn.disabled = true;
-  const prog   = document.getElementById('progress');
-  prog.textContent = `0 / ${addrs.length}`;
+  queryResEl.innerHTML = `<table>
+    <thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead><tbody></tbody></table>`;
+  const tbody = queryResEl.querySelector('tbody');
+  querySumEl.textContent = '';
 
-  // 清空结果与摘要
-  document.getElementById('result').innerHTML = `
-    <table><thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead><tbody></tbody></table>`;
-  const tbody = document.querySelector('#result tbody');
-  document.getElementById('summary').innerHTML = '';
-
-  let done = 0, xpTotal = 0, cursor = 0;
+  let cursor=0, done=0, totalXp=0;
 
   async function worker(){
-    while(cursor < addrs.length){
-      const i    = cursor++;
-      const addr = addrs[i].trim().toLowerCase();
+    while(cursor<addrs.length){
+      const i=cursor++;
+      const addr = addrs[i].toLowerCase();
       try{
-        const r  = await fetch(`/api/points?user=${addr}`);
+        const r = await fetch(`/api/points?user=${addr}`);
         if(!r.ok) throw new Error(r.status);
-        const txt= await r.text();
-        const dat= txt ? JSON.parse(txt) : {};
-        const o  = Array.isArray(dat) ? dat[0] : dat?.[0] ?? dat;
-        const xp = Number(o?.xp ?? 0);
-        const rk = o?.rank_xp ?? '-';
-        xpTotal += xp;
-        addRow(i, addr, xp ? xp.toLocaleString() : '-', rk);
-      }catch(err){
-        addRow(i, addr, '—', '查询失败', true);
+        const t=await r.text(), d=t?JSON.parse(t):{};
+        const o = Array.isArray(d)?d[0]:d?.[0]??d;
+        const xp=Number(o?.xp??0), rk=o?.rank_xp??'-';
+        totalXp += xp;
+        addRow(i,addr,xp?xp.toLocaleString():'-',rk);
+      }catch(e){
+        addRow(i,addr,'—','查询失败',true);
       }finally{
-        prog.textContent = `${++done} / ${addrs.length}`;
+        progressEl.textContent=`${++done} / ${addrs.length}`;
       }
     }
   }
-
-  function addRow(i, addr, lxp, rank, err=false){
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${i+1}</td><td>${addr}</td>
-      <td${err?' class="error"':''}>${lxp}</td>
-      <td${err?' class="error"':''}>${rank}</td>`;
+  function addRow(i,a,xp,rk,err=false){
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td><td>${a}</td>
+      <td${err?' class="error"':''}>${xp}</td>
+      <td${err?' class="error"':''}>${rk}</td>`;
     tbody.appendChild(tr);
   }
+  await Promise.all(Array.from({length:CONCURRENCY},worker));
+  progressEl.textContent+=' ✔';
+  queryBtn.disabled=false;
 
-  await Promise.all(Array.from({length: CONCURRENCY}, worker));
-  prog.textContent += ' ✔';
-  btn.disabled = false;
+  querySumEl.innerHTML=`<strong>已查询地址：</strong>${addrs.length} 个<br>
+    <strong>LXP-L 总和：</strong>${totalXp.toLocaleString()}`;
+  myXpInput.value = totalXp || '';
+  myXpPctEl.textContent = ((totalXp / TOTAL_SUPPLY)*100).toFixed(2);
+};
 
-  // 统计 & 估算
-  const summary = document.getElementById('summary');
-  let html = `<strong>已查询地址：</strong>${addrs.length} 个<br>
-              <strong>LXP-L 总和：</strong>${xpTotal.toLocaleString()}`;
-  if(xpTotal && fdv && ratios.length){
-    const share = xpTotal / TOTAL_SUPPLY;
-    html += `<br><strong>空投估算 (FDV \$${fdv.toLocaleString()}):</strong><br>`;
-    ratios.forEach(r=>{
-      const usd = fdv * r * share;
-      html += `&nbsp;&nbsp;• 比例 ${(r*100).toFixed(2)}% ≈ <strong>$${usd.toFixed(2)}</strong><br>`;
-    });
+/* ===== 空投估算 ===== */
+calcBtn.onclick = () => {
+  const xp   = Number(myXpInput.value)||0;
+  const fdv  = Number(fdvInput.value)||0;
+  const ratios = ratioInput.value.split(',')
+                .map(s=>Number(s.trim())/100).filter(n=>n>0);
+  if(!xp || !fdv || !ratios.length){
+    alert('请确保 FDV、空投比例和 LXP-L 数量均有效');return;
   }
-  summary.innerHTML = html;
-});
+
+  const tokenPrice = fdv / TOTAL_SUPPLY;  // 每 LXP-L 价格
+  const rows = ratios.map(r=>{
+    const usd   = xp * r * tokenPrice;
+    const token = xp * r;
+    const usdWan= usd / 10000;
+    return `<tr>
+      <td>${(r*100).toFixed(2)}%</td>
+      <td>${usdWan.toFixed(2)}</td>
+      <td>${token.toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+      <td>${tokenPrice.toFixed(6)}</td>
+      <td>${usd.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+  calcWrap.innerHTML = `<table>
+    <thead><tr><th>空投百分比</th><th>空投金额 (万元)</th>
+    <th>可分配代币数量 (枚)</th><th>每 LXP-L 价格 (USD)</th><th>你的空投价值 (USD)</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+};
 </script>
 </body>
 </html>
