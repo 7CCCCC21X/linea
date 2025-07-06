@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>LXP-L & 排名批量查询</title>
+  <title>LXP-L 批量查询 & 空投估算</title>
   <link rel="icon" href="favicon.ico" />
-
   <style>
     :root{
       --c-bg:#f9f9f9;--c-card:#fff;--c-text:#333;--c-sub:#666;
@@ -18,8 +17,8 @@
     }
     h1{text-align:center;margin:0 0 18px}
     textarea{
-      width:100%;height:120px;font-size:14px;padding:10px;
-      border:1px solid #ccc;border-radius:6px;resize:vertical;box-sizing:border-box;
+      width:100%;height:120px;padding:10px;font-size:14px;box-sizing:border-box;
+      border:1px solid #ccc;border-radius:6px;resize:vertical;
     }
     .ctrl{display:flex;align-items:center;gap:16px;margin:14px 0}
     button{
@@ -36,6 +35,8 @@
     th,td{padding:8px 6px;border:1px solid #e5e7eb;text-align:center;font-size:14px}
     tbody tr:nth-child(odd){background:#fafafa}
     .error{color:var(--c-error);font-weight:600}
+    .summary{margin-top:16px;font-size:15px;line-height:1.7}
+    .summary strong{color:var(--c-primary)}
     @media(prefers-color-scheme:dark){
       :root{--c-bg:#111827;--c-card:#1f2937;--c-text:#e5e7eb;--c-sub:#9ca3af}
       table{box-shadow:none}
@@ -45,7 +46,7 @@
   </style>
 </head>
 <body>
-  <h1>LXP-L & 排名批量查询</h1>
+  <h1>LXP-L 批量查询 & 空投估算</h1>
 
   <textarea id="addrInput" placeholder="每行一个钱包地址"></textarea>
 
@@ -55,68 +56,85 @@
   </div>
 
   <div id="result"></div>
+  <div id="summary" class="summary"></div>
 
-  <script>
-    const btn = document.getElementById('queryBtn');
+<script>
+const CONCURRENCY   = 5;                       // 并发数
+const TOTAL_SUPPLY  = 130_700_000_000;         // 1 307 亿 LXP-L
+const FDV           = 1_000_000_000;           // 10 亿 USD
+const RATIOS        = [0.02, 0.03, 0.05];      // 2%、3%、5%
 
-    btn.addEventListener('click', async () => {
-      const raw    = document.getElementById('addrInput').value.trim();
-      const addrs  = raw.split(/\s+/).filter(Boolean);
-      if (!addrs.length) return;
+const btn   = document.getElementById('queryBtn');
+btn.addEventListener('click', async () => {
+  const raw   = document.getElementById('addrInput').value.trim();
+  const addrs = raw.split(/\s+/).filter(Boolean);
+  if (!addrs.length) return;
 
-      btn.disabled = true;
-      const prog   = document.getElementById('progress');
-      prog.textContent = `0 / ${addrs.length}`;
+  btn.disabled = true;
+  const prog = document.getElementById('progress');
+  prog.textContent = `0 / ${addrs.length}`;
 
-      // 创建结果表
-      document.getElementById('result').innerHTML = `
-        <table>
-          <thead>
-            <tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr>
-          </thead><tbody></tbody>
-        </table>`;
-      const tbody  = document.querySelector('#result tbody');
+  // 初始化表格
+  document.getElementById('result').innerHTML = `
+    <table>
+      <thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead>
+      <tbody></tbody>
+    </table>`;
+  const tbody = document.querySelector('#result tbody');
+  document.getElementById('summary').innerHTML = '';
 
-      let done = 0;
-      const CONCURRENCY = 5;
-      let cursor = 0;
+  let done = 0, xpTotal = 0, cursor = 0;
 
-      async function worker() {
-        while (cursor < addrs.length) {
-          const idx  = cursor++;
-          const addr = addrs[idx].trim().toLowerCase();
-          const api  = `/api/points?user=${addr}`;   // ← 调用你在 Vercel 部署的代理
-
-          try {
-            const r   = await fetch(api);
-            if (!r.ok) throw new Error(`HTTP ${r.status}`);
-            const txt = await r.text();              // upstream 返回 text/plain
-            const dat = txt ? JSON.parse(txt) : {};
-            const o   = Array.isArray(dat) ? dat[0] : dat?.[0] ?? dat;
-            addRow(idx, addr, o?.xp ?? '-', o?.rank_xp ?? '-');
-          } catch (err) {
-            console.error(addr, err);
-            addRow(idx, addr, '—', '查询失败', true);
-          } finally {
-            prog.textContent = `${++done} / ${addrs.length}`;
-          }
-        }
+  async function worker(){
+    while(cursor < addrs.length){
+      const i    = cursor++;
+      const addr = addrs[i].trim().toLowerCase();
+      try{
+        const r  = await fetch(`/api/points?user=${addr}`);
+        if(!r.ok) throw new Error(r.status);
+        const t  = await r.text();
+        const d  = t ? JSON.parse(t) : {};
+        const o  = Array.isArray(d) ? d[0] : d?.[0] ?? d;
+        const xp = Number(o?.xp ?? 0);
+        const rk = o?.rank_xp ?? '-';
+        xpTotal += xp;
+        addRow(i, addr, xp ? xp.toLocaleString() : '-', rk);
+      }catch(e){
+        addRow(i, addr, '—', '查询失败', true);
+      }finally{
+        prog.textContent = `${++done} / ${addrs.length}`;
       }
+    }
+  }
 
-      function addRow(i, addr, lxp, rank, err=false) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${i + 1}</td>
-          <td>${addr}</td>
-          <td${err ? ' class="error"' : ''}>${lxp}</td>
-          <td${err ? ' class="error"' : ''}>${rank}</td>`;
-        tbody.appendChild(tr);
-      }
+  function addRow(i, addr, lxp, rank, err=false){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${addr}</td>
+      <td${err?' class="error"':''}>${lxp}</td>
+      <td${err?' class="error"':''}>${rank}</td>`;
+    tbody.appendChild(tr);
+  }
 
-      await Promise.all(Array.from({ length: CONCURRENCY }, worker));
-      prog.textContent += ' ✔';
-      btn.disabled = false;
+  await Promise.all(Array.from({length: CONCURRENCY}, worker));
+  prog.textContent += ' ✔';
+  btn.disabled = false;
+
+  // === 统计与估算 ===
+  const totalFmt = xpTotal.toLocaleString();
+  let html = `<strong>已查询地址：</strong>${addrs.length} 个<br>
+              <strong>LXP-L 总和：</strong>${totalFmt}`;
+  if(xpTotal){
+    const share = xpTotal / TOTAL_SUPPLY;
+    html += `<br><strong>空投估算 (FDV \$${(FDV/1e6).toLocaleString()}M)：</strong><br>`;
+    RATIOS.forEach(r=>{
+      const value = FDV * r * share;
+      html += `&nbsp;&nbsp;• 比例 ${(r*100).toFixed(0)}% ≈ <strong>$${value.toFixed(2)}</strong><br>`;
     });
-  </script>
+  }
+  document.getElementById('summary').innerHTML = html;
+});
+</script>
 </body>
 </html>
