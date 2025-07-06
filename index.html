@@ -1,71 +1,73 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>LXP-L 批量查询 & 空投估算</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LXP-L 批量查询 & 空投估算</title>
+<link rel="icon" href="oq6oo-k8xhm-001.ico">
 
-  <!-- 网站头像 -->
-  <link rel="icon" href="oq6oo-k8xhm-001.ico">
+<style>
+:root{
+  --bg: #fafafa;  --card:#fff;  --text:#333;
+  --sub:#666;     --primary:#28a745; --primary-d:#1e7e34;
+  --badge:#fb923c;--error:#e11d48;
+}
+[data-theme="dark"]{
+  --bg:#111827;--card:#1f2937;--text:#e5e7eb;--sub:#9ca3af;
+  --badge:#f97316;
+}
+body{font-family:-apple-system,Segoe UI,PingFang SC,Helvetica,Arial,sans-serif;
+     background:var(--bg);color:var(--text);margin:0;padding:32px;transition:.3s}
+.container{max-width:860px;margin:auto}
+.card{background:var(--card);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.05);
+      padding:28px 32px;margin-bottom:40px;position:relative;transition:.3s}
+h2{margin:0 0 20px;font-size:24px;display:flex;align-items:center;gap:8px}
+h2 .icon{font-size:26px}
+textarea{width:100%;height:110px;padding:10px;font-size:14px;border:1px solid #ccc;
+        border-radius:6px;resize:vertical;box-sizing:border-box}
+button{padding:8px 20px;font-size:15px;border:none;border-radius:6px;cursor:pointer;
+       background:var(--primary);color:#fff;transition:background .25s}
+button:hover{background:var(--primary-d)}
+button:disabled{opacity:.6;cursor:not-allowed}
+input[type="number"],input[type="text"],input[type="range"]{
+       padding:6px 8px;font-size:14px;border:1px solid #ccc;border-radius:6px}
+label{font-size:14px;color:var(--sub);display:flex;align-items:center;gap:6px;margin:8px 0}
+.badge{position:absolute;top:18px;right:26px;background:var(--badge);color:#fff;
+       padding:2px 10px;font-size:12px;border-radius:12px;font-weight:600}
+table{border-collapse:collapse;margin-top:16px;font-size:14px;min-width:640px}
+th,td{border:1px solid #e5e7eb;padding:6px;text-align:center;background:var(--card);transition:.3s}
+tbody tr:nth-child(odd){background:rgba(0,0,0,.025)}
+.hideRow{display:none}.loading{color:var(--sub)}
+.error{color:var(--error);font-weight:600}
+.summary{margin:8px 0 0;font-size:15px}.summary strong{color:var(--primary)}
+.fix-est{position:sticky;top:24px;z-index:5}
 
-  <!-- dom-to-image：生成分享图 -->
-  <script src="https://cdn.jsdelivr.net/npm/dom-to-image@2.6.0/dist/dom-to-image.min.js"></script>
+/* sticky columns */
+td.sticky,th.sticky{position:sticky;left:0;z-index:2;background:var(--card)}
+td.sticky-2,th.sticky-2{position:sticky;left:120px;z-index:2;background:var(--card)}
 
-  <style>
-    :root{
-      --c-bg:#fafafa; --c-card:#fff; --c-text:#333; --c-sub:#666;
-      --c-primary:#28a745; --c-primary-dark:#1e7e34; --c-error:#e11d48;
-    }
-    body{font-family:-apple-system,Segoe UI,PingFang SC,Helvetica,Arial,sans-serif;
-         background:var(--c-bg);color:var(--c-text);margin:0;padding:32px}
-    .container{max-width:860px;margin:auto}
-    .card{background:var(--c-card);border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.05);
-          padding:28px 32px;margin-bottom:40px;position:relative}
-    h2{margin:0 0 20px;font-size:24px;display:flex;align-items:center;gap:8px}
-    h2 .icon{font-size:26px}
-    textarea{width:100%;height:110px;padding:10px;font-size:14px;border:1px solid #ccc;
-            border-radius:6px;resize:vertical;box-sizing:border-box}
-    button{padding:8px 20px;font-size:15px;border:none;border-radius:6px;cursor:pointer;
-           background:var(--c-primary);color:#fff;transition:background .25s}
-    button:hover{background:var(--c-primary-dark)}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    input[type="number"],input[type="text"]{padding:6px 8px;font-size:14px;border:1px solid #ccc;
-            border-radius:6px;width:180px}
-    label{font-size:14px;color:var(--c-sub);display:flex;align-items:center;gap:6px;margin:8px 0}
-    .badge{position:absolute;top:18px;right:26px;background:#e1e1e1;color:#666;
-           padding:2px 8px;font-size:12px;border-radius:12px}
-    table{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
-    th,td{border:1px solid #e5e7eb;padding:6px;text-align:center}
-    tbody tr:nth-child(odd){background:#f5f5f5}
-    .hideRow{display:none}
-    .loading{color:var(--c-sub)}
-    .error{color:var(--c-error);font-weight:600}
-    .summary{margin:8px 0 0;font-size:15px}
-    .summary strong{color:var(--c-primary)}
-    .fix-est{position:sticky;top:24px;z-index:5}
+/* theme toggle */
+#themeBtn{position:fixed;right:24px;top:24px;width:40px;height:40px;border:none;
+          border-radius:50%;background:var(--card);color:var(--text);cursor:pointer;
+          box-shadow:0 2px 6px rgba(0,0,0,.15);font-size:18px}
+#toggleBtn{position:sticky;top:0;right:0;margin:0 0 -40px auto;background:#0078d4}
 
-    /* 分享按钮 */
-    #shareBtn{position:fixed;right:24px;bottom:24px;width:56px;height:56px;border:none;
-              border-radius:50%;font-size:14px;font-weight:600;background:var(--c-primary);
-              color:#fff;cursor:pointer;display:none;box-shadow:0 4px 10px rgba(0,0,0,.25)}
-    #shareBtn:hover{background:var(--c-primary-dark)}
-
-    @media(prefers-color-scheme:dark){
-      :root{--c-bg:#111827;--c-card:#1f2937;--c-text:#e5e7eb;--c-sub:#9ca3af}
-      table th,table td{border-color:#374151}
-      tbody tr:nth-child(odd){background:#1b2431}
-      .badge{background:#374151;color:#a5b4fc}
-    }
-  </style>
+/* horiz scroll */
+.table-wrap{overflow-x:auto}
+@media(prefers-color-scheme:dark){
+  body:not([data-theme="light"]){background:#111827;color:#e5e7eb}
+}
+</style>
 </head>
 <body>
 
-<!-- 分享按钮 -->
-<button id="shareBtn">分享</button>
+<!-- 右上角作者 + 主题按钮 -->
+<a href="https://x.com/0xXIAOc" target="_blank" style="position:fixed;right:80px;top:28px;font-size:14px;color:var(--primary);text-decoration:none">@0xXIAOc</a>
+<button id="themeBtn">🌓</button>
 
 <div class="container" id="captureArea">
 
-  <!-- ===== 查询卡片 ===== -->
+  <!-- 查询卡片 -->
   <div class="card">
     <span class="badge" id="badge">0/0</span>
     <h2><span class="icon">🌱</span>LXP-L 积分查询</h2>
@@ -73,32 +75,34 @@
     <textarea id="addrInput" placeholder="每行一个钱包地址"></textarea>
     <button id="queryBtn" style="margin-top:12px">开始查询</button>
 
-    <div id="queryResult"></div>
+    <div class="table-wrap">
+      <div id="queryResult"></div>
+    </div>
     <p id="querySummary" class="summary"></p>
-    <button id="toggleBtn" style="display:none;background:#0078d4">展开剩余</button>
+    <button id="toggleBtn" style="display:none">展开剩余</button>
   </div>
 
-  <!-- ===== 估算卡片 ===== -->
+  <!-- 估算卡片 -->
   <div class="card fix-est">
     <h2><span class="icon">🍯</span>空投金额估算</h2>
 
-    <!-- LXP-L 总量提示 -->
-    <p style="margin:-10px 0 10px;font-size:14px;color:var(--c-sub)">
+    <p style="margin:-10px 0 10px;font-size:14px;color:var(--sub)">
       LXP-L 总量：<strong>130,700,000,000</strong>
     </p>
 
-    <label>FDV =
-      <input id="fdvInput" type="number" value="1000000000" step="1000000">
-      <span id="fdvHint" style="font-size:14px;color:var(--c-sub)"></span>
+    <label>FDV:
+      <input id="fdvRange" type="range" min="100000000" max="3000000000" step="50000000">
+      <input id="fdvInput" type="number" value="1000000000" step="1000000" style="width:110px">
     </label>
 
-    <label>你的 LXP-L =
+    <label>空投百分比:
+      <input id="ratioRange" type="range" min="1" max="10" step="0.5">
+      <input id="ratioInput" type="text" value="2,3,5" style="width:80px">
+    </label>
+
+    <label>你的 LXP-L:
       <input id="myXpInput" type="number" placeholder="先查询或手填">
-      <span style="font-size:13px;color:var(--c-sub)">≈ <span id="myXpPct">0</span>%</span>
-    </label>
-
-    <label>空投百分比 =
-      <input id="ratioInput" type="text" value="2,3,5">
+      <span style="font-size:13px;color:var(--sub)">≈ <span id="myXpPct">0</span>%</span>
     </label>
 
     <button id="calcBtn">计算</button>
@@ -108,112 +112,103 @@
 </div>
 
 <script>
-/* ---- 常量 ---- */
-const TOTAL = 130_700_000_000;      // LXP-L 总量
-const CON   = 5;                    // 并发
-const PRE   = 20;                   // 立即展示行数
+/* === 主题切换 === */
+const themeBtn=document.getElementById('themeBtn');
+const themeKey='lxp-theme';
+function applyTheme(t){
+  document.documentElement.dataset.theme=t==='light'||t==='dark'?t:'';
+  themeBtn.textContent=t==='dark'?'🌞':t==='light'?'🌚':'🌓';
+}
+applyTheme(localStorage.getItem(themeKey)||'auto');
+themeBtn.onclick=()=>{
+  const cur=localStorage.getItem(themeKey)||'auto';
+  const next=cur==='auto'?'light':cur==='light'?'dark':'auto';
+  localStorage.setItem(themeKey,next);applyTheme(next);
+};
 
-/* ---- FDV 提示 ---- */
-const fdvI=document.getElementById('fdvInput');
-const fdvH=document.getElementById('fdvHint');
-fdvI.oninput=()=>fdvH.textContent=fdvI.value ? `≈ ${(fdvI.value/1e8).toFixed(2)} 亿` : '';
-fdvI.oninput();
-
-/* ---- 绑定 DOM ---- */
+/* === 常量 & 基础 === */
+const TOTAL=130_700_000_000,CON=5,PRE=20;
 const badge=document.getElementById('badge');
-const queryBtn=document.getElementById('queryBtn');
 const toggleBtn=document.getElementById('toggleBtn');
-const shareBtn=document.getElementById('shareBtn');
+const fdvInput=document.getElementById('fdvInput');
+const fdvRange=document.getElementById('fdvRange');
+const ratioInput=document.getElementById('ratioInput');
+const ratioRange=document.getElementById('ratioRange');
 const myXpInput=document.getElementById('myXpInput');
 const myXpPct=document.getElementById('myXpPct');
-const calcBtn=document.getElementById('calcBtn');
 const calcWrap=document.getElementById('calcTableWrap');
 
-/* ---- 批量查询 ---- */
-queryBtn.onclick=async()=>{
-  const addrs=document.getElementById('addrInput').value.trim().split(/\s+/).filter(Boolean);
-  if(!addrs.length) return;
-  badge.textContent=`0/${addrs.length}`; shareBtn.style.display='none';
+/* --- FDV & 比例滑块双向绑定 --- */
+fdvRange.oninput=()=>fdvInput.value=fdvRange.value;
+fdvInput.oninput=()=>fdvRange.value=fdvInput.value;
+ratioRange.oninput=()=>ratioInput.value=ratioRange.value;
+ratioInput.onchange=()=>{const v=ratioInput.value.split(',')[0];ratioRange.value=parseFloat(v)||2};
 
-  /* 生成表格与占位行 */
+/* === 查询 === */
+document.getElementById('queryBtn').onclick=async()=>{
+  const addrs=document.getElementById('addrInput').value.trim().split(/\s+/).filter(Boolean);
+  if(!addrs.length)return;
+  badge.textContent=`0/${addrs.length}`;
+
   const tbody=(()=>{document.getElementById('queryResult').innerHTML=
-    '<table><thead><tr><th>#</th><th>地址</th><th>LXP-L</th><th>排名</th></tr></thead><tbody></tbody></table>';
+    '<table><thead><tr><th class="sticky">#</th><th class="sticky-2">地址</th><th>LXP-L</th><th>排名</th></tr></thead><tbody></tbody></table>';
     return document.querySelector('#queryResult tbody');})();
-  const rowMap={};
+  const map={};
   addrs.forEach((a,i)=>{
     const tr=document.createElement('tr');
     if(i>=PRE) tr.className='hideRow';
-    tr.innerHTML=`<td>${i+1}</td><td>${a.toLowerCase()}</td>
-                 <td class="loading">加载中</td><td class="loading">加载中</td>`;
-    tbody.appendChild(tr); rowMap[a.toLowerCase()]=tr;
+    tr.innerHTML=`<td class="sticky">${i+1}</td><td class="sticky-2">${a.toLowerCase()}</td>
+      <td class="loading">加载中</td><td class="loading">加载中</td>`;
+    tbody.appendChild(tr);map[a.toLowerCase()]=tr;
   });
-
-  /* 展开按钮立即可见 */
   if(addrs.length>PRE){
     toggleBtn.textContent=`展开剩余 ${addrs.length-PRE} 行`;
     toggleBtn.style.display='inline-block';
   }else toggleBtn.style.display='none';
 
-  /* 并发请求 */
   let cur=0,done=0,sum=0;
   async function worker(){
     while(cur<addrs.length){
-      const i=cur++,addr=addrs[i].toLowerCase();
-      let xp=0,rk='-',err=false;
+      const addr=addrs[cur++].toLowerCase(); let xp=0,rk='-',err=false;
       try{
-        const r=await fetch(`/api/points?user=${addr}`); if(!r.ok) throw 0;
-        const d=JSON.parse(await r.text()||'{}'); const o=Array.isArray(d)?d[0]:d?.[0]??d;
-        xp=+o?.xp||0; rk=o?.rank_xp??'-'; sum+=xp;
+        const r=await fetch(`/api/points?user=${addr}`);if(!r.ok)throw 0;
+        const d=JSON.parse(await r.text()||'{}');const o=Array.isArray(d)?d[0]:d?.[0]??d;
+        xp=+o?.xp||0;rk=o?.rank_xp??'-';sum+=xp;
       }catch{err=true;}
-      const td=rowMap[addr].children;
-      td[2].textContent=xp?xp.toLocaleString():'—';
-      td[3].textContent=rk;
-      td[2].className=td[3].className=err?'error':'';
+      const tds=map[addr].children;
+      tds[2].textContent=xp?xp.toLocaleString():'—';tds[3].textContent=rk;
+      tds[2].className=tds[3].className=err?'error':'';
       badge.textContent=`${++done}/${addrs.length}`;
     }
   }
   await Promise.all(Array.from({length:CON},worker));
-
-  /* 汇总 & 估算 */
   document.getElementById('querySummary').innerHTML=
     `<strong>地址：</strong>${addrs.length}　|　<strong>LXP-L：</strong>${sum.toLocaleString()}`;
-  myXpInput.value=sum; myXpPct.textContent=((sum/TOTAL)*100).toFixed(2);
-  autoCalc(); shareBtn.style.display='block';
+  myXpInput.value=sum;myXpPct.textContent=((sum/TOTAL)*100).toFixed(2);autoCalc();
 };
 
-/* 展开 / 收起 */
+/* 展开/收起 */
 toggleBtn.onclick=()=>{
   const rows=document.querySelectorAll('.hideRow');
-  const exp=toggleBtn.textContent.startsWith('展开');
-  rows.forEach(r=>r.style.display=exp?'table-row':'none');
-  toggleBtn.textContent=exp?'收起':`展开剩余 ${rows.length} 行`;
+  const show=toggleBtn.textContent.startsWith('展开');
+  rows.forEach(r=>r.style.display=show?'table-row':'none');
+  toggleBtn.textContent=show?'收起':`展开剩余 ${rows.length} 行`;
 };
 
-/* ---- 估算 ---- */
-function autoCalc(){ calcBtn.click(); }
-calcBtn.onclick=()=>{
-  const xp=+myXpInput.value||0, fdv=+fdvI.value||0,
-        rates=document.getElementById('ratioInput').value.split(',')
-              .map(s=>+s/100).filter(n=>n>0);
+/* === 估算 === */
+function autoCalc(){document.getElementById('calcBtn').click();}
+document.getElementById('calcBtn').onclick=()=>{
+  const xp=+myXpInput.value||0,fdv=+fdvInput.value||0;
+  const rates=ratioInput.value.split(',').map(s=>+s/100).filter(n=>n>0);
   if(!xp||!fdv||!rates.length)return;
   const price=fdv/TOTAL;
-  calcWrap.innerHTML=`<table><thead><tr><th>空投百分比</th><th>空投金额 (万元)</th>
-    <th>每 LXP-L 价格 (USD)</th><th>你的空投价值 (USD)</th></tr></thead><tbody>
-    ${rates.map(r=>`<tr><td>${(r*100).toFixed(2)}%</td>
+  calcWrap.innerHTML=`<table><thead><tr><th>空投%</th><th>空投金额(万元)</th>
+    <th>每 LXP-L (USD)</th><th>你的空投 (USD)</th></tr></thead><tbody>
+    ${rates.map(r=>`<tr><td>${(r*100).toFixed(2)}</td>
       <td>${(fdv*r/1e4).toLocaleString(undefined,{maximumFractionDigits:2})}</td>
       <td>${price.toFixed(6)}</td>
       <td>${(xp*r*price).toFixed(2)}</td></tr>`).join('')}
   </tbody></table>`;
-};
-
-/* ---- 分享：新标签页显示图片 ---- */
-shareBtn.onclick=()=>{
-  shareBtn.disabled=true; shareBtn.textContent='生成…';
-  domtoimage.toPng(document.getElementById('captureArea'),{pixelRatio:2})
-    .then(url=>{window.open(url,'_blank');
-      shareBtn.disabled=false; shareBtn.textContent='分享';})
-    .catch(e=>{alert('生成失败'); console.error(e);
-      shareBtn.disabled=false; shareBtn.textContent='分享';});
 };
 </script>
 </body>
